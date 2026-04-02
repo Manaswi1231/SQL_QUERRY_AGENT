@@ -15,8 +15,18 @@ function Dashboard() {
 
   useEffect(() => {
     loadHistory()
-  }, [])
-
+    fetchSchema()
+  },[])
+  
+  const fetchSchema = async (connstr=null) => {
+    try{
+      const schema_response= await queryAPI.getSchema(connstr)
+      setSchema(schema_response.data)
+    }
+    catch(err){
+      console.error('Failed to fetch schema', err)
+    }
+  }
   const loadHistory = async () => {
     try {
       const res = await historyAPI.getHistory({ limit: 50 })
@@ -37,9 +47,10 @@ function Dashboard() {
     try {
       const connStr = connectionMode === 'custom' ? connectionString : null;
       const res = await queryAPI.askQuestion(question, connStr)
-      const schema_response= await queryAPI.getSchema(connStr)
       setResponse(res.data)
-      setSchema(schema_response.data)
+      if(connectionMode==='custom'){
+        fetchSchema(connStr) // Refresh schema if custom connection was used
+      }
       loadHistory() // Refresh history
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to get response')
