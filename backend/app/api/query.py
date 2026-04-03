@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
+from decimal import Decimal
+from datetime import date, datetime
+from typing import Any
 
 from app.core.database import get_app_db, get_target_db_session
 from app.core.security import get_current_user
@@ -12,6 +15,18 @@ from app.services.llm_service import llm_service
 from app.services.query_service import query_service
 
 router = APIRouter(prefix="/api/query", tags=["Query"])
+
+
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle Decimal, date, and datetime types"""
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, Decimal):
+            return float(obj)
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        if isinstance(obj, bytes):
+            return obj.decode('utf-8', errors='replace')
+        return super().default(obj)
 
 
 @router.post("/schema", response_model=dict)
@@ -97,12 +112,21 @@ async def ask_question(
         # Step 4: Execute the query
         exec_result = await query_service.execute_query(db_session, generated_sql)
         
-        # Step 5: Save to history
+        # Step 5: Convert Decimal and other non-serializable types to standard Python types
+        def convert_row(row: dict) -> dict:
+            return {k: (float(v) if isinstance(v, Decimal) else 
+                       (v.isoformat() if isinstance(v, (date, datetime)) else
+                       (v.decode('utf-8', errors='replace') if isinstance(v, bytes) else v)))
+                    for k, v in row.items()}
+        
+        result_rows = [convert_row(row) for row in exec_result.get("rows", [])]
+        
+        # Step 6: Save to history
         history = QueryHistory(
             user_id=current_user.id,
             natural_question=request.question,
             generated_sql=generated_sql,
-            execution_result=json.dumps(exec_result.get("rows", [])),
+            execution_result=json.dumps(result_rows, cls=CustomJSONEncoder),
             error_message=exec_result.get("error") if not exec_result.get("success") else None
         )
         app_db.add(history)
@@ -111,7 +135,7 @@ async def ask_question(
         return QueryResponse(
             sql=generated_sql,
             explanation=explanation,
-            result=exec_result.get("rows", []) if exec_result.get("success") else None,
+            result=result_rows if exec_result.get("success") else None,
             columns=exec_result.get("columns", []),
             error=exec_result.get("error") if not exec_result.get("success") else None
         )
