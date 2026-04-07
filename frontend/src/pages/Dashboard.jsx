@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { queryAPI, historyAPI } from "../services/api";
+import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 import SchemaVisualization from "./SchemaVisualization";
 import Table from "./Table";
 
 const emptyResponse = () => ({
-  result: null,
+  result: [],
   sql: "",
-  explanation: "",
+  explanation: "No explanation available",
   error: "",
 });
 
@@ -74,7 +75,6 @@ function Dashboard() {
           window.location.href = "/login";
         }, 2000);
       }
-
       setError(err.response?.data?.detail || "Failed to get response");
     } finally {
       setLoading(false);
@@ -123,6 +123,7 @@ function Dashboard() {
 
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* Sidebar */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-800">Query History</h2>
@@ -138,9 +139,9 @@ function Dashboard() {
                   sql: item.generated_sql,
                   result: item.execution_result
                     ? JSON.parse(item.execution_result)
-                    : null,
-                  explanation: "",
+                    : [],
                   error: item.error_message || "",
+                  explanation: item.explanation || "No explanation available",
                 });
               }}
             >
@@ -174,16 +175,14 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
         <div className="bg-white border-b border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                SQL Query Agent
-              </h1>
-              <p className="text-sm text-gray-600">
-                Ask questions in natural language
-              </p>
+              <h1 className="text-2xl font-bold text-gray-800">SQL Query Agent</h1>
+              <p className="text-sm text-gray-600">Ask questions in natural language</p>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">LLM Provider:</span>
@@ -194,9 +193,12 @@ function Dashboard() {
           </div>
         </div>
 
-        <div className="flex-1 flex min-h-0">
+        {/* Body: query area + schema panel */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left: query + results */}
           <div className="flex-1 p-8 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
+              {/* Connection settings */}
               <div className="mb-6 p-4 bg-white rounded-lg shadow border border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">
                   Database Connection
@@ -211,9 +213,7 @@ function Dashboard() {
                       onChange={() => handleConnectionChange("default")}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-sm text-gray-700">
-                      Default Demo DB
-                    </span>
+                    <span className="text-sm text-gray-700">Default Demo DB</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -224,9 +224,7 @@ function Dashboard() {
                       onChange={() => handleConnectionChange("custom")}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-sm text-gray-700">
-                      Custom Connection String
-                    </span>
+                    <span className="text-sm text-gray-700">Custom Connection String</span>
                   </label>
                 </div>
                 {connectionMode === "custom" && (
@@ -241,6 +239,7 @@ function Dashboard() {
                 )}
               </div>
 
+              {/* Question input */}
               <form onSubmit={handleSubmit} className="mb-8">
                 <div className="flex gap-4">
                   <input
@@ -261,21 +260,34 @@ function Dashboard() {
                 </div>
               </form>
 
-              {!schema?.tables?.length ? (
+              {/* No schema warning */}
+              {!schema?.tables?.length && (
                 <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-6">
                   <p className="text-yellow-800 text-sm">
-                    ⚠️ No schema loaded. The database might be empty or the
-                    connection failed. Check the right panel.
+                    ⚠️ No schema loaded. The database might be empty or the connection failed. Check the right panel.
                   </p>
                 </div>
-              ) : null}
+              )}
 
-              {hasQueryOutput ? (
+              {/* Generated SQL */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-4 text-gray-800">Generated SQL:</h3>
+                <code
+                  className="block bg-gray-100 p-4 rounded mb-2 overflow-x-auto text-sm text-gray-800"
+                  dangerouslySetInnerHTML={{
+                    __html: response?.sql
+                      ? hljs.highlightAuto(response.sql).value
+                      : '<span class="text-gray-500">No SQL generated</span>',
+                  }}
+                />
+              </div>
+
+              {/* Query output */}
+              {hasQueryOutput && (
                 <div className="space-y-6">
+                  {/* Explanation */}
                   <div className="bg-white p-6 rounded-lg shadow overflow-hidden">
-                    <h3 className="text-lg font-semibold mb-4 text-gray-800">
-                      Explanation
-                    </h3>
+                    <h3 className="text-lg font-semibold mb-4 text-gray-800">Explanation</h3>
                     <code
                       className="block bg-gray-100 p-4 rounded mb-2 overflow-x-auto text-sm text-gray-800"
                       dangerouslySetInnerHTML={{
@@ -286,34 +298,32 @@ function Dashboard() {
                     />
                   </div>
 
-                  {!response?.error?.trim() ? (
-                    <Table response={response} />
-                  ) : null}
+                  {/* Results table */}
+                  {!response?.error?.trim() && <Table response={response.result} />}
 
-                  {response?.error?.trim() ? (
+                  {/* Error */}
+                  {response?.error?.trim() && (
                     <div className="bg-red-50 p-6 rounded-lg border border-red-200">
-                      <h3 className="text-lg font-semibold mb-2 text-red-800">
-                        Error
-                      </h3>
+                      <h3 className="text-lg font-semibold mb-2 text-red-800">Error</h3>
                       <p className="text-red-600">{response.error}</p>
                     </div>
-                  ) : null}
+                  )}
                 </div>
-              ) : null}
+              )}
 
-              {error ? (
+              {/* Auth / network error */}
+              {error && (
                 <div className="bg-red-50 p-4 rounded-lg border border-red-200 mt-4">
                   <p className="text-red-600 text-sm">{error}</p>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
 
+          {/* Right: schema panel */}
           <div className="bg-gray-50 border-l border-gray-200 p-6 overflow-y-auto flex flex-col w-96 shrink-0">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
-                📊 Database Schema
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-800">📊 Database Schema</h2>
               <p className="text-sm text-gray-500">
                 {schemaLoading
                   ? "Loading schema..."
