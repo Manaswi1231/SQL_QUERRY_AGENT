@@ -8,30 +8,30 @@ load_dotenv()
 
 class Settings(BaseSettings):
     # Database for users, auth, and query history
-    APP_DATABASE_URL: str
+    APP_DATABASE_URL: str = os.getenv("APP_DATABASE_URL")
     
     # Default target database for querying (sample data)
-    DEFAULT_TARGET_DB_URL: str
+    DEFAULT_TARGET_DB_URL: str = os.getenv("DEFAULT_TARGET_DB_URL")
     
     # JWT Settings
-    SECRET_KEY: str
-    ALGORITHM: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    SECRET_KEY: str = os.getenv("SECRET_KEY")
+    ALGORITHM: str = os.getenv("ALGORITHM")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")
     
     # LLM Settings (Ollama)
-    LLM_PROVIDER: str  # or "openai"
-    LLAMA_BASE_URL: str
-    LLAMA_MODEL: str
-    LLAMA_VERIFY_SSL: bool
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER")  
+    LLAMA_BASE_URL: str = os.getenv("LLAMA_BASE_URL")
+    LLAMA_MODEL: str = os.getenv("LLAMA_MODEL")
+    LLAMA_VERIFY_SSL: bool =os.getenv("LLAMA_VERIFY_SSL")
     
-    # Gemini / OpenAI Settings (optional)
-    GOOGLE_API_KEY: Optional[str] = None
+    # germini Settings (alternative)
+    GOOGLE_API_KEY: str=str(os.getenv("GOOGLE_API_KEY"))
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-3.5-turbo"
     
     # Query Settings
-    MAX_QUERY_ROWS: int
-    QUERY_TIMEOUT_SECONDS: int
+    MAX_QUERY_ROWS: int = os.getenv("MAX_QUERY_ROWS")
+    QUERY_TIMEOUT_SECONDS: int = os.getenv("QUERY_TIMEOUT_SECONDS")
 
     class Config:
         env_file = ".env"
